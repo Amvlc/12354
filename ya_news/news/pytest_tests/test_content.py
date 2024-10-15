@@ -13,7 +13,7 @@ def client():
 @pytest.fixture
 def setup_news(db):
     news_list = [
-        News.objects.create(title=f"News {i}", content="Content")
+        News.objects.create(title=f"News {i}", text="Some text for News {i}")
         for i in range(15)
     ]
     return news_list
