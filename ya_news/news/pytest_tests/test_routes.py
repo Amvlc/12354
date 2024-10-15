@@ -41,9 +41,9 @@ def test_comment_edit_redirect_if_anonymous(client):
     assert "/login/" in response.url
 
 
-def test_comment_edit_access_denied_for_non_author(client, user):
-    other_user = User.objects.create_user("other", "pass")
-    client.force_login(other_user)
+def test_comment_edit_access_denied_for_non_author(client):
+    User.objects.create_user("other", "pass")
+    client.force_login(User.objects.get(username="other"))
     url = reverse("news:edit", kwargs={"pk": 1})
     response = client.get(url)
     assert response.status_code == 404

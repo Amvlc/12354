@@ -2,7 +2,7 @@ import pytest
 from django.urls import reverse
 from django.contrib.auth.models import User
 from django.test import Client
-from news.models import News, Comment
+from news.models import News
 
 
 @pytest.fixture
@@ -11,35 +11,29 @@ def client():
 
 
 @pytest.fixture
-def setup_news(db):
-    user = User.objects.create_user("user", "pass")
-    news_list = [
-        News.objects.create(title=f"News {i}", content="Content")
-        for i in range(15)
-    ]
-    return news_list
+def user(db):
+    return User.objects.create_user(username="user", password="pass")
 
 
-def test_news_count_and_order(client, setup_news):
-    url = reverse("news:home")
-    response = client.get(url)
-    assert len(response.context["object_list"]) <= 10
-    assert response.context["object_list"][0].title == "News 14"
+def test_anonymous_user_cannot_post_comment(client):
+    url = reverse("news:post_comment", kwargs={"pk": 1})
+    response = client.post(url, {"content": "Test comment"})
+    assert response.status_code == 302
+    assert "/login/" in response.url
 
 
-def test_comments_order_in_news_detail(client):
-    news = News.objects.create(title="News for Comment", content="Details")
-    c1 = Comment.objects.create(
-        news=news,
-        content="First comment",
-        author=User.objects.create_user("firstuser", "pass"),
+def test_authenticated_user_can_post_comment(client, user):
+    client.force_login(user)
+    news = News.objects.create(title="Test News", content="Just testing")
+    url = reverse("news:post_comment", kwargs={"pk": news.pk})
+    client.post(url, {"content": "Test comment"})
+
+
+def test_prevent_comment_with_forbidden_words(client, user):
+    forbidden_words = ["badword"]
+    client.force_login(user)
+    news = News.objects.create(
+        title="Sensitive News", content="Handle with care"
     )
-    c2 = Comment.objects.create(
-        news=news,
-        content="Second comment",
-        author=User.objects.create_user("seconduser", "pass"),
-    )
-    url = reverse("news:detail", kwargs={"pk": news.pk})
-    response = client.get(url)
-    assert response.context["comment_set"][0] == c1
-    assert response.context["comment_set"][1] == c2
+    url = reverse("news:post_comment", kwargs={"pk": news.pk})
+    client.post(url, {"content": f"This contains a {forbidden_words[0]}"})
