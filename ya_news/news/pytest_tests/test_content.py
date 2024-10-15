@@ -22,7 +22,7 @@ def setup_news(db):
 def test_news_count_and_order(client, setup_news):
     url = reverse("news:home")
     response = client.get(url)
-    assert len(response.context["object_list"]) <= 10
+    assert len(response.context["object_list"]) == 10
     assert response.context["object_list"][0].title == "News 14"
 
 

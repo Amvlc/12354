@@ -3,6 +3,7 @@ from django.contrib.auth.mixins import LoginRequiredMixin
 from django.shortcuts import get_object_or_404
 from django.urls import reverse
 from django.views import generic
+from django.http import HttpResponse
 
 from .forms import CommentForm
 from .models import Comment, News
@@ -102,3 +103,7 @@ class CommentUpdate(CommentBase, generic.UpdateView):
 class CommentDelete(CommentBase, generic.DeleteView):
     """Удаление комментария."""
     template_name = 'news/delete.html'
+
+
+def post_comment(request, news_id):
+    return HttpResponse("Comment posted!")
