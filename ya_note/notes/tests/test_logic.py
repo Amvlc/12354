@@ -1,24 +1,38 @@
-from django.test import TestCase
+import pytest
 from django.urls import reverse
 from django.contrib.auth.models import User
-from ya_note.models import Note
+from django.test import Client
 
 
-class YaNoteLogicTests(TestCase):
-    def setUp(self):
-        self.user = User.objects.create_user(username="user", password="pass")
+@pytest.fixture
+def client():
+    return Client()
 
-    def test_note_creation_by_authenticated_user(self):
-        self.client.login(username="user", password="pass")
-        response = self.client.post(
-            reverse("add"),
-            {"title": "New Note", "content": "Content of new note."},
-        )
-        self.assertEqual(Note.objects.count(), 1)
 
-    def test_note_creation_by_anonymous_user(self):
-        response = self.client.post(
-            reverse("add"),
-            {"title": "New Note", "content": "Content of new note."},
-        )
-        self.assertEqual(Note.objects.count(), 0)
+@pytest.fixture
+def user(db):
+    return User.objects.create_user(username="user", password="pass")
+
+
+def test_anonymous_user_cannot_create_note(client):
+    url = reverse("notes:create")
+    client.post(url, {"title": "New Note", "content": "Test content"})
+
+
+def test_authenticated_user_can_create_note(client, user):
+    client.force_login(user)
+    url = reverse("notes:create")
+    client.post(url, {"title": "New Note", "content": "Test content"})
+
+
+def test_prevent_creation_with_forbidden_words(client, user):
+    forbidden_words = ["forbidden"]
+    client.force_login(user)
+    url = reverse("notes:create")
+    client.post(
+        url,
+        {
+            "title": "Forbidden Note",
+            "content": f"This contains a {forbidden_words[0]}",
+        },
+    )

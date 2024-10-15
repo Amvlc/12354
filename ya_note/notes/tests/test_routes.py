@@ -1,36 +1,43 @@
-from django.test import TestCase
+import pytest
 from django.urls import reverse
 from django.contrib.auth.models import User
+from django.test import Client
 
 
-class YaNoteRouteTests(TestCase):
-    def setUp(self):
-        self.user = User.objects.create_user(username="user", password="pass")
-        self.user.save()
+@pytest.fixture
+def client():
+    return Client()
 
-    def test_home_page_for_anonymous(self):
-        response = self.client.get(reverse("home"))
-        self.assertEqual(response.status_code, 200)
 
-    def test_note_pages_for_authenticated(self):
-        self.client.login(username="user", password="pass")
-        response = self.client.get(reverse("notes"))
-        self.assertEqual(response.status_code, 200)
-        response = self.client.get(reverse("done"))
-        self.assertEqual(response.status_code, 200)
-        response = self.client.get(reverse("add"))
-        self.assertEqual(response.status_code, 200)
+def test_home_page_accessibility(client):
+    url = reverse("notes:home")
+    response = client.get(url)
+    assert response.status_code == 200
 
-    def test_note_pages_for_unauthenticated(self):
-        pages = ["notes", "done", "add"]
-        for page in pages:
-            response = self.client.get(reverse(page))
-            self.assertRedirects(response, "/login/?next=" + reverse(page))
 
-    def test_note_operations_for_non_author(self):
-        other_user = User.objects.create_user(
-            username="other", password="pass"
-        )
-        self.client.login(username="other", password="pass")
-        response = self.client.get(reverse("note_detail", kwargs={"pk": 1}))
-        self.assertEqual(response.status_code, 404)
+def test_note_detail_accessibility(client):
+    url = reverse("notes:detail", kwargs={"pk": 1})
+    response = client.get(url)
+    assert response.status_code == 200
+
+
+def test_note_edit_access_for_author(client):
+    user = User.objects.create_user(username="author", password="pass")
+    client.force_login(user)
+    url = reverse("notes:edit", kwargs={"pk": 1})
+    response = client.get(url)
+    assert response.status_code == 200
+
+
+def test_note_edit_redirect_if_anonymous(client):
+    url = reverse("notes:edit", kwargs={"pk": 1})
+    response = client.get(url)
+    assert response.status_code == 302
+
+
+def test_note_edit_access_denied_for_non_author(client):
+    another_user = User.objects.create_user("other", "pass")
+    client.force_login(another_user)
+    url = reverse("notes:edit", kwargs={"pk": 1})
+    response = client.get(url)
+    assert response.status_code == 404
