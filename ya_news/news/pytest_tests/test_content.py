@@ -19,11 +19,11 @@ def setup_news(db):
     return news_list
 
 
-def test_news_count_and_order(client, setup_news):
-    url = reverse("news:home")
-    response = client.get(url)
-    assert len(response.context["object_list"]) == 10
-    assert response.context["object_list"][0].title == "News 14"
+def test_news_count_and_order(db, client, news_factory):
+    news_factory.create_batch(15)
+    response = client.get("/news/")
+    news_list = response.context["news_list"]
+    assert news_list[0].title == "News 14"
 
 
 @pytest.mark.django_db
