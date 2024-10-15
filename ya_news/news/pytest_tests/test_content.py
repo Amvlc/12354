@@ -2,7 +2,7 @@ import pytest
 from django.urls import reverse
 from django.contrib.auth.models import User
 from django.test import Client
-from news.models import News
+from news.models import News, Comment
 
 
 @pytest.fixture
@@ -12,7 +12,6 @@ def client():
 
 @pytest.fixture
 def setup_news(db):
-    user = User.objects.create_user("user", "pass")
     news_list = [
         News.objects.create(title=f"News {i}", content="Content")
         for i in range(15)
