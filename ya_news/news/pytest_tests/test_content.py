@@ -100,28 +100,27 @@ def test_news_detail_accessibility(client):
 
 
 @pytest.mark.django_db
-def test_anonymous_user_cannot_post_comment(client):
-    url = reverse("news:post_comment", kwargs={"news_id": 1})
-    response = client.post(url, {"text": "Test comment"})
-    assert response.status_code == 403
-
-
-@pytest.mark.django_db
-def test_authenticated_user_can_post_comment(client, user):
-    client.force_login(user)
-    news = News.objects.create(title="Test News", text="Just testing")
-    url = reverse("news:post_comment", kwargs={"news_id": news.id})
+def test_anonymous_user_cannot_post_comment(client, setup_news):
+    news = setup_news[0]
+    url = reverse("news:detail", kwargs={"pk": news.pk})
     response = client.post(url, {"text": "Test comment"})
     assert response.status_code == 302
 
 
 @pytest.mark.django_db
-def test_prevent_comment_with_forbidden_words(client, user):
-    forbidden_words = ["badword"]
+def test_authenticated_user_can_post_comment(client, user, setup_news):
     client.force_login(user)
-    news = News.objects.create(title="Sensitive News", text="Handle with care")
-    url = reverse("news:post_comment", kwargs={"news_id": news.id})
-    response = client.post(
-        url, {"text": f"This contains a {forbidden_words[0]}"}
-    )
-    assert response.status_code == 403
+    news = setup_news[0]
+    url = reverse("news:detail", kwargs={"pk": news.pk})
+    response = client.post(url, {"text": "Test comment"})
+    assert response.status_code == 302
+
+
+@pytest.mark.django_db
+def test_prevent_comment_with_forbidden_words(client, user, setup_news):
+    client.force_login(user)
+    news = setup_news[0]
+    url = reverse("news:detail", kwargs={"pk": news.pk})
+    response = client.post(url, {"text": "This contains a badword"})
+    assert response.status_code == 200
+    assert not Comment.objects.filter(text="This contains a badword").exists()
