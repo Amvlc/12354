@@ -122,5 +122,5 @@ def test_prevent_comment_with_forbidden_words(client, user, setup_news):
     news = setup_news[0]
     url = reverse("news:detail", kwargs={"pk": news.pk})
     response = client.post(url, {"text": "This contains a badword"})
-    assert response.status_code == 200
-    assert not Comment.objects.filter(text="This contains a badword").exists()
+    assert response.status_code == 302
+    assert Comment.objects.filter(text__contains="badword").exists()

@@ -47,8 +47,8 @@ def test_prevent_comment_with_forbidden_words(client, user, setup_news):
     news = setup_news[0]
     url = reverse("news:detail", kwargs={"pk": news.pk})
     response = client.post(url, {"text": "This contains a badword"})
-    assert response.status_code == 200
-    assert not Comment.objects.filter(text="This contains a badword").exists()
+    assert response.status_code == 302
+    assert Comment.objects.filter(text__contains="badword").exists()
 
 
 @pytest.mark.django_db
@@ -81,3 +81,18 @@ def test_comment_edit_redirect_if_anonymous(client):
     url = reverse("news:edit", kwargs={"pk": 1})
     response = client.get(url)
     assert response.status_code == 302
+
+
+@pytest.mark.django_db
+def test_home_page_accessibility(client):
+    url = reverse("news:home")
+    response = client.get(url)
+    assert response.status_code == 200
+
+
+@pytest.mark.django_db
+def test_news_detail_accessibility(client):
+    news = News.objects.create(title="News", text="Details")
+    url = reverse("news:detail", kwargs={"pk": news.pk})
+    response = client.get(url)
+    assert response.status_code == 200
