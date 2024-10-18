@@ -1,33 +1,46 @@
 from django.test import TestCase
 from django.urls import reverse
 from django.contrib.auth.models import User
-from django.apps import apps
-
-Note = apps.get_model("notes", "Note")
+from notes.models import Note
 
 
 class YaNoteContentTests(TestCase):
-    def setUp(self):
-        self.user = User.objects.create_user(username="user", password="pass")
-        self.note = Note.objects.create(
-            title="Test Note", text="This is a test.", author=self.user
+    LIST_URL = reverse("notes:list")
+    CREATE_URL = reverse("notes:create")
+    UPDATE_URL = reverse("notes:update", args=[1])
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.user = User.objects.create_user(username="user", password="pass")
+        cls.note = Note.objects.create(
+            title="Test Note", text="This is a test.", author=cls.user
+        )
+        cls.other_user = User.objects.create_user(
+            username="other", password="pass"
+        )
+        cls.other_note = Note.objects.create(
+            title="Other Note",
+            text="This is another test.",
+            author=cls.other_user,
         )
 
+    def setUp(self):
+        self.client_user = self.client.force_login(self.user)
+        self.client_other_user = self.client.force_login(self.other_user)
+
     def test_notes_list_context(self):
-        self.client.login(username="user", password="pass")
-        response = self.client.get(reverse("notes:list"))
+        response = self.client_user.get(self.LIST_URL)
         self.assertIn("object_list", response.context)
         self.assertIn(self.note, response.context["object_list"])
 
     def test_isolation_of_notes(self):
-        other_user = User.objects.create_user(
-            username="other", password="pass"
-        )
-        other_note = Note.objects.create(
-            title="Other Note",
-            text="This is another test.",
-            author=other_user,
-        )
-        self.client.login(username="user", password="pass")
-        response = self.client.get(reverse("notes:list"))
-        self.assertNotIn(other_note, response.context["object_list"])
+        response = self.client_user.get(self.LIST_URL)
+        self.assertNotIn(self.other_note, response.context["object_list"])
+
+    def test_create_note_form(self):
+        response = self.client_user.get(self.CREATE_URL)
+        self.assertIn("form", response.context)
+
+    def test_update_note_form(self):
+        response = self.client_user.get(self.UPDATE_URL)
+        self.assertIn("form", response.context)

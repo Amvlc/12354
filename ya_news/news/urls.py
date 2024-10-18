@@ -16,4 +16,5 @@ urlpatterns = [
     path(
         "post_comment/<int:news_id>/", views.post_comment, name="post_comment"
     ),
+
 ]

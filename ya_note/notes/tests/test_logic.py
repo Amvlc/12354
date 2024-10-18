@@ -1,81 +1,90 @@
-from django.shortcuts import render, redirect, get_object_or_404
-from django.contrib.auth.decorators import login_required
-from django.contrib.auth.mixins import LoginRequiredMixin, UserPassesTestMixin
-from django.views.generic import (
-    ListView,
-    DetailView,
-    CreateView,
-    UpdateView,
-    DeleteView,
-)
-from django.urls import reverse_lazy
-from django.apps import apps
-
-Note = apps.get_model("notes", "Note")
+from django.test import TestCase
+from django.urls import reverse
+from django.contrib.auth.models import User
+from notes.models import Note
+from pytils.translit import slugify
 
 
-class NotesListView(ListView):
-    model = Note
-    template_name = "notes/notes_list.html"
-    context_object_name = "notes"
+class NotesViewTests(TestCase):
 
-    def get_queryset(self):
-        return Note.objects.filter(author=self.request.user)
+    def setUp(self):
+        self.user = User.objects.create_user(username="user", password="pass")
+        self.client.login(username="user", password="pass")
 
+    def test_anonymous_user_cannot_create_note(self):
+        self.client.logout()
+        response = self.client.post(
+            reverse("notes:create"),
+            {"title": "Test Note", "text": "Test text"},
+        )
+        self.assertEqual(response.status_code, 302)
+        self.assertFalse(Note.objects.filter(title="Test Note").exists())
 
-class NoteDetailView(DetailView):
-    model = Note
-    template_name = "notes/note_detail.html"
-    context_object_name = "note"
+    def test_slug_uniqueness(self):
+        Note.objects.create(
+            title="First Note",
+            text="First text",
+            author=self.user,
+            slug="unique-slug",
+        )
+        response = self.client.post(
+            reverse("notes:create"),
+            {
+                "title": "Second Note",
+                "text": "Second text",
+                "slug": "unique-slug",
+            },
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "slug with this slug already exists.")
 
-    def get_object(self, queryset=None):
-        return get_object_or_404(Note, slug=self.kwargs["slug"])
+    def test_slug_auto_generation(self):
+        response = self.client.post(
+            reverse("notes:create"),
+            {"title": "Auto Slug Note", "text": "Test text"},
+        )
+        note = Note.objects.get(id=response.context["object"].id)
+        self.assertEqual(note.slug, slugify("Auto Slug Note"))
 
+    def test_user_can_edit_own_note(self):
+        note = Note.objects.create(
+            title="Editable Note", text="Editable text", author=self.user
+        )
+        response = self.client.post(
+            reverse("notes:update", args=[note.slug]),
+            {"title": "Updated Note", "text": "Updated text"},
+        )
+        self.assertEqual(response.status_code, 302)
+        note.refresh_from_db()
+        self.assertEqual(note.title, "Updated Note")
 
-class NoteCreateView(LoginRequiredMixin, CreateView):
-    model = Note
-    fields = ["title", "text"]
-    template_name = "notes/note_form.html"
+    def test_user_cannot_edit_other_user_note(self):
+        other_user = User.objects.create_user(
+            username="other", password="pass"
+        )
+        note = Note.objects.create(
+            title="Other User Note", text="Other text", author=other_user
+        )
+        response = self.client.post(
+            reverse("notes:update", args=[note.slug]),
+            {"title": "Malicious Edit", "text": "Malicious text"},
+        )
+        self.assertEqual(response.status_code, 403)
 
-    def form_valid(self, form):
-        form.instance.author = self.request.user
-        return super().form_valid(form)
+    def test_user_can_delete_own_note(self):
+        note = Note.objects.create(
+            title="Deletable Note", text="Deletable text", author=self.user
+        )
+        response = self.client.post(reverse("notes:delete", args=[note.slug]))
+        self.assertEqual(response.status_code, 302)
+        self.assertFalse(Note.objects.filter(id=note.id).exists())
 
-
-class NoteUpdateView(LoginRequiredMixin, UserPassesTestMixin, UpdateView):
-    model = Note
-    fields = ["title", "text"]
-    template_name = "notes/note_form.html"
-
-    def get_object(self, queryset=None):
-        return get_object_or_404(Note, slug=self.kwargs["slug"])
-
-    def test_func(self):
-        note = self.get_object()
-        return self.request.user == note.author
-
-
-class NoteDeleteView(LoginRequiredMixin, UserPassesTestMixin, DeleteView):
-    model = Note
-    template_name = "notes/note_confirm_delete.html"
-    success_url = reverse_lazy("notes")
-
-    def get_object(self, queryset=None):
-        return get_object_or_404(Note, slug=self.kwargs["slug"])
-
-    def test_func(self):
-        note = self.get_object()
-        return self.request.user == note.author
-
-
-@login_required
-def note_edit(request, slug):
-    note = get_object_or_404(Note, slug=slug)
-    if request.user != note.author:
-        return redirect("home")
-    if request.method == "POST":
-        note.title = request.POST.get("title")
-        note.text = request.POST.get("text")
-        note.save()
-        return redirect("note_detail", slug=note.slug)
-    return render(request, "notes/note_form.html", {"note": note})
+    def test_user_cannot_delete_other_user_note(self):
+        other_user = User.objects.create_user(
+            username="other", password="pass"
+        )
+        note = Note.objects.create(
+            title="Other User Note", text="Other text", author=other_user
+        )
+        response = self.client.post(reverse("notes:delete", args=[note.slug]))
+        self.assertEqual(response.status_code, 403)

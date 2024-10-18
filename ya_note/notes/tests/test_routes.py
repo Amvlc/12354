@@ -14,39 +14,46 @@ class YaNoteRoutesTests(TestCase):
             title="Test Note", text="This is a test note", author=self.user
         )
 
-    def test_home_page_accessibility(self):
-        response = self.client.get(reverse("notes:home"))
+    def test_page_accessibility(self):
+        urls = {
+            "home": reverse("notes:home"),
+            "note_list": reverse("notes:list"),
+            "note_detail": reverse(
+                "notes:detail", kwargs={"slug": self.note.slug}
+            ),
+            "note_edit": reverse(
+                "notes:edit", kwargs={"slug": self.note.slug}
+            ),
+            "note_delete": reverse(
+                "notes:delete", kwargs={"slug": self.note.slug}
+            ),
+        }
+
+        response = self.client.get(urls["home"])
         self.assertEqual(response.status_code, 200)
 
-    def test_note_detail_accessibility(self):
+        for url_name in [
+            "note_list",
+            "note_detail",
+            "note_edit",
+            "note_delete",
+        ]:
+            with self.subTest(url=url_name):
+                response = self.client.get(urls[url_name])
+                self.assertRedirects(
+                    response, f"/auth/login/?next={urls[url_name]}"
+                )
+
         self.client.login(username="user", password="pass")
-        url = reverse("notes:detail", kwargs={"slug": self.note.slug})
-        response = self.client.get(url)
-        self.assertEqual(response.status_code, 200)
+        for url_name in ["note_list", "note_detail", "note_edit"]:
+            with self.subTest(url=url_name):
+                response = self.client.get(urls[url_name])
+                self.assertEqual(response.status_code, 200)
 
-    def test_note_edit_access_denied_for_non_author(self):
-        other_user = User.objects.create_user(
-            username="other", password="pass"
-        )
         self.client.login(username="other", password="pass")
-        url = reverse("notes:edit", kwargs={"slug": self.note.slug})
-        response = self.client.get(url)
+        response = self.client.get(urls["note_edit"])
         self.assertEqual(response.status_code, 404)
-        self.client.logout()
-        self.client.login(username=other_user.username, password="pass")
 
-    def test_note_edit_access_for_author(self):
         self.client.login(username="user", password="pass")
-        url = reverse("notes:edit", kwargs={"slug": self.note.slug})
-        response = self.client.get(url)
-        self.assertEqual(response.status_code, 200)
-
-    def test_note_edit_redirect_if_anonymous(self):
-        url = reverse("notes:edit", kwargs={"slug": self.note.slug})
-        response = self.client.get(url)
-        self.assertRedirects(response, f"/auth/login/?next={url}")
-
-    def test_note_list_accessibility(self):
-        self.client.login(username="user", password="pass")
-        response = self.client.get(reverse("notes:list"))
+        response = self.client.get(urls["note_edit"])
         self.assertEqual(response.status_code, 200)
