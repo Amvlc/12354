@@ -1,6 +1,8 @@
 import pytest
+
 from django.contrib.auth import get_user_model
 from django.test import Client
+
 from news.models import News, Comment
 
 User = get_user_model()
@@ -12,52 +14,38 @@ def user():
 
 
 @pytest.fixture
-def authenticated_client(client, user):
+def author_client(db):
+    user = User.objects.create_user(username='author', password='password')
+    client = Client()
     client.force_login(user)
+    return client, user
+
+
+@pytest.fixture
+def not_author_client(db):
+    user = User.objects.create_user(username="not_author", password="testpass")
+    client = Client()
+    client.login(username=user.username, password="testpass")
     return client
 
 
 @pytest.fixture
-def setup_news(db):
-    news_list = [
-        News(title=f"News {i}", text=f"Some text for News {i}")
-        for i in range(11)
-    ]
-    News.objects.bulk_create(news_list)
-    return news_list
+def comment_data():
+    return {"text": "Новый комментарий"}
 
 
 @pytest.fixture
-def setup_comments(db, setup_news):
-    news = setup_news[0]
-    comments = [
-        Comment(
-            news=news,
-            text=f"Comment {i}",
-            author=User.objects.create_user(
-                username=f"commenter{i}", password="pass"
-            ),
-        )
-        for i in range(5)
-    ]
-    Comment.objects.bulk_create(comments)
-    return comments
+def news_item(author_client):
+    return News.objects.create(
+        title="Новость",
+        text="Содержимое",
+    )
 
 
 @pytest.fixture
-def client():
-    return Client()
-
-
-@pytest.fixture
-def user(db):
-    return User.objects.create_user(username="user", password="pass")
-
-
-@pytest.fixture
-def setup_news(db):
-    news_list = [
-        News.objects.create(title=f"News {i}", text="Some text for News {i}")
-        for i in range(15)
-    ]
-    return news_list
+def comment_item(news_item, author_client):
+    return Comment.objects.create(
+        text="Комментарий",
+        news=news_item,
+        author=author_client[1],
+    )

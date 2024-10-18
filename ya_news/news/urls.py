@@ -2,6 +2,7 @@ from django.urls import path
 
 from news import views
 
+app_name = "comments"
 app_name = "news"
 
 urlpatterns = [
@@ -16,5 +17,4 @@ urlpatterns = [
     path(
         "post_comment/<int:news_id>/", views.post_comment, name="post_comment"
     ),
-
 ]
